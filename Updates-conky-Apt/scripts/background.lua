@@ -1,6 +1,6 @@
 -- background.lua
 -- by @wim66
--- April 17 2025
+-- May 6, 2025
 
 -- === Required Cairo Modules ===
 require 'cairo'
@@ -8,6 +8,9 @@ require 'cairo'
 local status, cairo_xlib = pcall(require, 'cairo_xlib')
 
 if not status then
+    -- If not found, fall back to a dummy table
+    -- Redirects unknown keys to the global namespace (_G)
+    -- Allows use of global Cairo functions like cairo_xlib_surface_create
     cairo_xlib = setmetatable({}, {
         __index = function(_, k)
             return _G[k]
@@ -47,13 +50,27 @@ local function parse_bg_color(bg_color_str)
     if hex and alpha then
         return { {1, tonumber(hex, 16), tonumber(alpha)} }
     end
-    -- Fallback to solid black if parsing fails
-    return { {1, 0x000000, 1} }
+    -- Fallback to semi-transparent black
+    return { {1, 0x000000, 0.5} }
+end
+
+-- Parse a layer_2 color string like "0,0xRRGGBB,alpha,..." into a gradient table
+local function parse_layer2_color(layer2_color_str)
+    local gradient = {}
+    for position, color, alpha in layer2_color_str:gmatch("([%d%.]+),0x(%x+),([%d%.]+)") do
+        table.insert(gradient, {tonumber(position), tonumber(color, 16), tonumber(alpha)})
+    end
+    -- Return a default gradient if parsing fails
+    if #gradient == 3 then
+        return gradient
+    end
+    return { {0, 0x55007f, 0.5}, {0.5, 0xff69ff, 0.5}, {1, 0x55007f, 0.5} }
 end
 
 -- Read color values from settings.lua variables
-local border_color = parse_border_color(border_COLOR)
-local bg_color = parse_bg_color(bg_COLOR)
+local border_color = parse_border_color(border_COLOR or "0,0x003E00,1,0.5,0x03F404,1,1,0x003E00,1")
+local bg_color = parse_bg_color(bg_COLOR or "0x000000,0.5")
+local layer2_color = parse_layer2_color(layer_2 or "0,0x55007f,0.5,0.5,0xff69ff,0.5,1,0x55007f,0.5")
 
 -- === All drawable elements ===
 local boxes_settings = {
